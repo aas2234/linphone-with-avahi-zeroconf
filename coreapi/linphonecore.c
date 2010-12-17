@@ -353,6 +353,13 @@ void linphone_core_disable_logs(){
 	ortp_set_log_level_mask(ORTP_ERROR|ORTP_FATAL);
 }
 
+static void zeroconf_config_read(LinphoneCore *lc)
+{
+	int tmp;
+	tmp=lp_config_get_int(lc->config,"net","zeroconf_enabled",0);
+	linphone_core_enable_zeroconf(lc,tmp);
+	linphone_core_set_zeroconf_enabled(lc,tmp);
+}
 
 static void net_config_read (LinphoneCore *lc)
 {
@@ -376,9 +383,6 @@ static void net_config_read (LinphoneCore *lc)
 	linphone_core_set_mtu(lc,tmp);
 	tmp=lp_config_get_int(lc->config,"net","download_ptime",0);
 	linphone_core_set_download_ptime(lc,tmp);
-	tmp=lp_config_get_int(lc->config,"net","zeroconf_enabled",0);
-	linphone_core_enable_zeroconf(lc,tmp);
-	linphone_core_set_zeroconf_enabled(lc,tmp);
 }
 
 static void build_sound_devices_table(LinphoneCore *lc){
@@ -987,11 +991,12 @@ static void linphone_core_init (LinphoneCore * lc, const LinphoneCoreVTable *vta
 	
 	sip_setup_register_all();
 	sound_config_read(lc);
+	net_config_read(lc);
 	rtp_config_read(lc);
 	codecs_config_read(lc);
 	sip_config_read(lc); /* this will start eXosip*/
-	net_config_read(lc);
 	video_config_read(lc);
+	zeroconf_config_read(lc); /* this will start the avahi threads */
 	//autoreplier_config_init(&lc->autoreplier_conf);
 	lc->presence_mode=LinphoneStatusOnline;
 	lc->max_call_logs=15;

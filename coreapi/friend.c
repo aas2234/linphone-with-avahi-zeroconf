@@ -424,16 +424,15 @@ void linphone_core_add_zeroconf_friend(LinphoneCore *lc, LinphoneFriend *lf) {
 }
 
 void linphone_core_add_zeroconf_friend_as_contact(LinphoneCore *lc,LinphoneFriend *fl) {
-	LinphoneFriend *zf=NULL;
-	linphone_friend_send_subscribe(fl,TRUE);
-	linphone_friend_set_inc_subscribe_policy(fl,LinphoneSPAccept);
-	if (linphone_core_get_friend_by_address(lc,linphone_address_as_string(fl->uri))) {
+	const char *uri=linphone_address_as_string_uri_only(fl->uri);
+	if (linphone_core_get_friend_by_address(lc,uri)) {
+		linphone_friend_set_inc_subscribe_policy(fl,LinphoneSPAccept);
 		linphone_friend_done(fl);
 	}else{
-		linphone_core_unlink_zeroconf_friend(lc,fl);
-		linphone_core_add_friend(lc,fl);
-		zf=linphone_friend_new_zeroconf_with_uri(linphone_address_as_string_uri_only(fl->uri));
-		linphone_core_add_zeroconf_friend(lc,zf);
+		LinphoneFriend *new_fr=linphone_friend_new_with_addr(uri);
+		linphone_friend_set_inc_subscribe_policy(new_fr,LinphoneSPAccept);
+		linphone_core_add_friend(lc,new_fr);
+		linphone_friend_send_subscribe(new_fr,TRUE);
 	}
 }
 
