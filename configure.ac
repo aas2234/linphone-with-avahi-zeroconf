@@ -232,6 +232,15 @@ AC_ARG_ENABLE(rsvp,
 AC_DEFINE(VINCENT_MAURY_RSVP,1,[Tell whether RSVP support
 should be compiled.]) )
 
+dnl Added by Abhishek Srivastava for compiling in Avahi support
+PKG_CHECK_MODULES([AVAHI_CLIENT], [avahi-client])
+AC_SUBST(AVAHI_CLIENT_CFLAGS)
+AC_SUBST(AVAHI_CLIENT_LDFLAGS)
+
+PKG_CHECK_MODULES([GLIB], [glib-2.0])
+AC_SUBST(GLIB_CFLAGS)
+AC_SUBST(GLIB_LDFLAGS)
+
 if test "x${prefix}" = "xNONE"; then
 	package_prefix=${ac_default_prefix}
 else

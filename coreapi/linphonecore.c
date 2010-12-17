@@ -52,6 +52,9 @@ static void toggle_video_preview(LinphoneCore *lc, bool_t val);
 
 extern SalCallbacks linphone_sal_callbacks;
 
+/* Avahi Start / Stop Function Prototypes */
+int start_avahi(LinphoneCore*);
+int stop_avahi(LinphoneCore*);
 
 void lc_callback_obj_init(LCCallbackObj *obj,LinphoneCoreCbFunc func,void* ud)
 {
@@ -373,7 +376,9 @@ static void net_config_read (LinphoneCore *lc)
 	linphone_core_set_mtu(lc,tmp);
 	tmp=lp_config_get_int(lc->config,"net","download_ptime",0);
 	linphone_core_set_download_ptime(lc,tmp);
-
+	tmp=lp_config_get_int(lc->config,"net","zeroconf_enabled",0);
+	linphone_core_enable_zeroconf(lc,tmp);
+	linphone_core_set_zeroconf_enabled(lc,tmp);
 }
 
 static void build_sound_devices_table(LinphoneCore *lc){
@@ -880,6 +885,14 @@ const char * linphone_core_get_version(void){
 	return liblinphone_version;
 }
 
+int linphone_core_get_zeroconf_enabled(LinphoneCore *lc) {
+	return lc->net_conf.zeroconf_enabled;
+}
+
+void linphone_core_set_zeroconf_enabled(LinphoneCore *lc, int val) {
+	lc->net_conf.zeroconf_enabled = val;
+}
+
 
 static MSList *linphone_payload_types=NULL;
 
@@ -974,10 +987,10 @@ static void linphone_core_init (LinphoneCore * lc, const LinphoneCoreVTable *vta
 	
 	sip_setup_register_all();
 	sound_config_read(lc);
-	net_config_read(lc);
 	rtp_config_read(lc);
 	codecs_config_read(lc);
 	sip_config_read(lc); /* this will start eXosip*/
+	net_config_read(lc);
 	video_config_read(lc);
 	//autoreplier_config_init(&lc->autoreplier_conf);
 	lc->presence_mode=LinphoneStatusOnline;
@@ -1187,6 +1200,9 @@ const MSList * linphone_core_get_friend_list(const LinphoneCore *lc)
 	return lc->friends;
 }
 
+const MSList * linphone_core_get_zeroconf_friends_list(const LinphoneCore *lc) {
+	return lc->zeroconf_friends;
+}
 /**
  * Returns the nominal jitter buffer size in milliseconds.
  *
@@ -1470,6 +1486,33 @@ void linphone_core_enable_ipv6(LinphoneCore *lc, bool_t val){
 			apply_transports(lc);
 		}
 	}
+}
+
+bool_t linphone_core_zeroconf_enabled(LinphoneCore *lc){
+	return lc->net_conf.zeroconf_enabled;
+}
+
+void linphone_core_enable_zeroconf(LinphoneCore* lc, bool_t val){
+    
+    if(linphone_core_get_zeroconf_enabled(lc) != val) {
+        linphone_core_set_zeroconf_enabled(lc,val);
+        if(lc->net_conf.zeroconf_enabled) {
+
+            /* Join them to main().. or not, since they will suspend main() */
+			if(!start_avahi(lc))
+				fprintf(stderr,"\n Failed to start Avahi zeroconf"); // Better Error Logging
+        }
+        else{
+            /* Tell threads to die ? */
+           if(!stop_avahi(lc))
+			   fprintf(stderr, "\n Failed to stop Avahi zeroconf");	 // Better Error Logging here too 
+        }
+    }
+}
+
+void linphone_core_zeroconf_refresh(LinphoneCore *lc){
+	if(lc->vtable.zeroconf_refresh)
+		lc->vtable.zeroconf_refresh();
 }
 
 static void display_bandwidth(RtpSession *as, RtpSession *vs){
@@ -3634,7 +3677,8 @@ void net_config_uninit(LinphoneCore *lc)
 		ms_free(lc->net_conf.nat_address);
 	}
 	lp_config_set_int(lc->config,"net","firewall_policy",config->firewall_policy);
-	lp_config_set_int(lc->config,"net","mtu",config->mtu);	
+	lp_config_set_int(lc->config,"net","mtu",config->mtu);
+	lp_config_set_int(lc->config,"net","zeroconf_enabled",config->zeroconf_enabled);
 }
 
 

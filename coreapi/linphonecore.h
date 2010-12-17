@@ -105,6 +105,8 @@ char *linphone_address_as_string(const LinphoneAddress *u);
 char *linphone_address_as_string_uri_only(const LinphoneAddress *u);
 bool_t linphone_address_weak_equal(const LinphoneAddress *a1, const LinphoneAddress *a2);
 void linphone_address_destroy(LinphoneAddress *u);
+void linphone_gtk_show_zeroconf_friends(void);
+void linphone_core_zeroconf_refresh(LinphoneCore *lc);
 
 struct _SipSetupContext;
 
@@ -527,7 +529,8 @@ typedef void (*DtmfReceived)(struct _LinphoneCore* lc, LinphoneCall *call, int d
 typedef void (*ReferReceived)(struct _LinphoneCore *lc, const char *refer_to);
 /** Callback prototype */
 typedef void (*BuddyInfoUpdated)(struct _LinphoneCore *lc, LinphoneFriend *lf);
-
+/** Callback prototype */
+typedef void (*ZeroconfRefresh)(void);
 /**
  * This structure holds all callbacks that the application should implement.
  *  None is mandatory.
@@ -550,6 +553,7 @@ typedef struct _LinphoneVTable{
 	DisplayMessageCb display_warning;/** Callback to display a warning to the user */
 	DisplayUrlCb display_url;
 	ShowInterfaceCb show; /**< Notifies the application that it should show up*/
+	ZeroconfRefresh zeroconf_refresh; /** Refresh the Zeroconf Friend List */
 } LinphoneCoreVTable;
 
 /**
@@ -645,6 +649,13 @@ bool_t linphone_core_get_guess_hostname(LinphoneCore *lc);
 bool_t linphone_core_ipv6_enabled(LinphoneCore *lc);
 void linphone_core_enable_ipv6(LinphoneCore *lc, bool_t val);
 
+bool_t linphone_core_zeroconf_enabled(LinphoneCore *lc);
+void linphone_core_enable_zeroconf(LinphoneCore* lc, bool_t val);
+
+bool_t linphone_core_zeroconf_enabled(LinphoneCore *lc);
+
+const MSList *linphone_core_get_zeroconf_friends_list(const LinphoneCore *lc);
+
 LinphoneAddress *linphone_core_get_primary_contact_parsed(LinphoneCore *lc);
 const char * linphone_core_get_identity(LinphoneCore *lc);
 /*0= no bandwidth limit*/
@@ -664,6 +675,10 @@ void linphone_core_set_download_ptime(LinphoneCore *lc, int ptime);
  * @ingroup media_parameters
  */
 int  linphone_core_get_download_ptime(LinphoneCore *lc);
+
+int linphone_core_get_zeroconf_enabled(LinphoneCore *lc);
+
+void linphone_core_set_zeroconf_enabled(LinphoneCore *lc, int val);
 
 /* returns a MSList of PayloadType */
 const MSList *linphone_core_get_audio_codecs(const LinphoneCore *lc);

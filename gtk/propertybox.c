@@ -102,6 +102,12 @@ void linphone_gtk_ipv6_toggled(GtkWidget *w){
 				gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)));
 }
 
+void linphone_gtk_zeroconf_enabled(GtkWidget *w){
+	linphone_core_enable_zeroconf(linphone_gtk_get_core(),
+				   gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)));
+  
+}
+
 void linphone_gtk_udp_sip_port_changed(GtkWidget *w){
 	LCSipTransports tr;
 	LinphoneCore *lc=linphone_gtk_get_core();
@@ -762,6 +768,8 @@ void linphone_gtk_show_parameters(void){
 	LCSipTransports tr;
 
 	/* NETWORK CONFIG */
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(linphone_gtk_get_widget(pb,"zeroconf_enabled")),
+				linphone_core_zeroconf_enabled(lc));
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(linphone_gtk_get_widget(pb,"ipv6_enabled")),
 				linphone_core_ipv6_enabled(lc));
 	linphone_core_get_sip_transports(lc,&tr);

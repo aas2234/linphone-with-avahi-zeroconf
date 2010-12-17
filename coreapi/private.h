@@ -318,6 +318,7 @@ typedef struct net_config
 	int mtu;
 	int down_ptime;
 	bool_t nat_sdp_only;
+	bool_t zeroconf_enabled;
 }net_config_t;
 
 
@@ -395,6 +396,7 @@ struct _LinphoneCore
 	autoreplier_config_t autoreplier_conf;
 	LinphoneProxyConfig *default_proxy;
 	MSList *friends;
+	MSList *zeroconf_friends;
 	MSList *auth_info;
 	struct _RingStream *ringstream;
 	time_t dmfs_playing_start_time;

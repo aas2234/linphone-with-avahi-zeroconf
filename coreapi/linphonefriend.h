@@ -237,6 +237,13 @@ void linphone_core_add_friend(LinphoneCore *lc, LinphoneFriend *fr);
  */
 void linphone_core_remove_friend(LinphoneCore *lc, LinphoneFriend *fr);
 /**
+ * add a friend discovered by zeroconf
+ * @param lc #LinphoneCore object
+ * @param lf #LinphoneFriend to add
+ */
+void linphone_core_add_zeroconf_friend(LinphoneCore *lc, LinphoneFriend *lf);
+
+/**
  * Black list a friend. same as linphone_friend_set_inc_subscribe_policy() with #LinphoneSPDeny policy;
  * @param lc #LinphoneCore object
  * @param lf #LinphoneFriend to add
@@ -255,6 +262,24 @@ const MSList * linphone_core_get_friend_list(const LinphoneCore *lc);
 void linphone_core_notify_all_friends(LinphoneCore *lc, LinphoneOnlineStatus os);
 LinphoneFriend *linphone_core_get_friend_by_address(const LinphoneCore *lc, const char *addr);
 LinphoneFriend *linphone_core_get_friend_by_ref_key(const LinphoneCore *lc, const char *key);
+
+void linphone_core_add_zeroconf_friend(LinphoneCore *lc, LinphoneFriend *lf);
+
+/**
+ * Finds all zeroconf_friends in lc->friends and removes them
+ * @param lc #LinphoneCore object
+ */
+void linphone_core_remove_zeroconf_friends(LinphoneCore *lc);
+
+LinphoneFriend *linphone_friend_new_zeroconf_with_uri(const char *addr);
+
+void linphone_core_remove_zeroconf_friend(LinphoneCore *lc,LinphoneFriend *lf);
+
+void linphone_core_unlink_zeroconf_friend(LinphoneCore *lc,LinphoneFriend *lf);
+
+LinphoneFriend *linphone_core_get_zeroconf_friend_by_address(LinphoneCore *lc, const char *addr);
+
+void linphone_core_add_zeroconf_friend_as_contact(LinphoneCore *lc,LinphoneFriend *fl);
 
 /**
  * @}

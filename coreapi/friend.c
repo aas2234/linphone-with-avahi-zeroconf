@@ -150,6 +150,21 @@ LinphoneFriend * linphone_friend_new(){
 	return obj;	
 }
 
+LinphoneFriend *linphone_friend_new_zeroconf_with_uri(const char *addr){
+	LinphoneAddress* linphone_address = linphone_address_new(addr);
+	if (linphone_address == NULL) {
+		ms_error("Cannot create friend for address [%s]",addr?addr:"null");
+		return NULL;
+	}
+	LinphoneFriend *fr=linphone_friend_new();
+	fr->status=LinphoneStatusOnline;
+	if (linphone_friend_set_addr(fr,linphone_address)<0){
+		linphone_friend_destroy(fr);
+		return NULL;
+	}
+	return fr;
+}
+
 LinphoneFriend *linphone_friend_new_with_addr(const char *addr){
 	LinphoneAddress* linphone_address = linphone_address_new(addr);
 	if (linphone_address == NULL) {
@@ -390,6 +405,53 @@ void linphone_core_add_friend(LinphoneCore *lc, LinphoneFriend *lf)
 	return ;
 }
 
+void linphone_core_add_zeroconf_friend(LinphoneCore *lc, LinphoneFriend *lf) {
+	LinphoneFriend *fr=NULL;
+	const char *uri=linphone_address_as_string_uri_only(lf->uri);
+	ms_return_if_fail(lf->lc==NULL);
+	ms_return_if_fail(lf->uri!=NULL);
+	if ((fr=linphone_core_get_zeroconf_friend_by_address(lc,uri))!=NULL){
+		char *tmp=NULL;
+		const LinphoneAddress *addr=linphone_friend_get_address(fr);
+		if (addr) tmp=linphone_address_as_string(addr);
+		ms_warning("Friend %s already in list, ignored.", tmp ? tmp : "unknown");
+		if (tmp) ms_free(tmp);
+		return ;
+	}
+	lc->zeroconf_friends=ms_list_append(lc->zeroconf_friends,lf);	
+	lc->vtable.zeroconf_refresh();
+	return ;
+}
+
+void linphone_core_add_zeroconf_friend_as_contact(LinphoneCore *lc,LinphoneFriend *fl) {
+	LinphoneFriend *zf=NULL;
+	linphone_friend_send_subscribe(fl,TRUE);
+	linphone_friend_set_inc_subscribe_policy(fl,LinphoneSPAccept);
+	if (linphone_core_get_friend_by_address(lc,linphone_address_as_string(fl->uri))) {
+		linphone_friend_done(fl);
+	}else{
+		linphone_core_unlink_zeroconf_friend(lc,fl);
+		linphone_core_add_friend(lc,fl);
+		zf=linphone_friend_new_zeroconf_with_uri(linphone_address_as_string_uri_only(fl->uri));
+		linphone_core_add_zeroconf_friend(lc,zf);
+	}
+}
+
+void linphone_core_unlink_zeroconf_friend(LinphoneCore *lc, LinphoneFriend* fl){
+	MSList *el=ms_list_find(lc->zeroconf_friends,(void *)fl);
+	if (el!=NULL){
+		lc->zeroconf_friends=ms_list_remove_link(lc->zeroconf_friends,el);
+	}
+}
+
+void linphone_core_remove_zeroconf_friend(LinphoneCore *lc, LinphoneFriend* fl){
+	MSList *el=ms_list_find(lc->zeroconf_friends,(void *)fl);
+	if (el!=NULL){
+		lc->zeroconf_friends=ms_list_remove_link(lc->zeroconf_friends,el);
+		linphone_friend_destroy((LinphoneFriend*)el->data);
+	}
+}
+
 void linphone_core_remove_friend(LinphoneCore *lc, LinphoneFriend* fl){
 	MSList *el=ms_list_find(lc->friends,(void *)fl);
 	if (el!=NULL){
@@ -427,6 +489,29 @@ static bool_t username_match(const char *u1, const char *u2){
 	if (u1==NULL && u2==NULL) return TRUE;
 	if (u1 && u2 && strcasecmp(u1,u2)==0) return TRUE;
 	return FALSE;
+}
+
+LinphoneFriend *linphone_core_get_zeroconf_friend_by_address(LinphoneCore *lc, const char *uri){
+	LinphoneAddress *puri=linphone_address_new(uri);
+	const MSList *elem;
+	const char *username=linphone_address_get_username(puri);
+	const char *domain=linphone_address_get_domain(puri);
+	LinphoneFriend *lf=NULL;
+
+	if (puri==NULL){
+		return NULL;
+	}
+	for(elem=lc->zeroconf_friends;elem!=NULL;elem=ms_list_next(elem)){
+		lf=(LinphoneFriend*)elem->data;
+		const char *it_username=linphone_address_get_username(lf->uri);
+		const char *it_host=linphone_address_get_domain(lf->uri);;
+		if (strcasecmp(domain,it_host)==0 && username_match(username,it_username)){
+			break;
+		}
+		lf=NULL;
+	}
+	linphone_address_destroy(puri);
+	return lf;
 }
 
 LinphoneFriend *linphone_core_get_friend_by_address(const LinphoneCore *lc, const char *uri){
@@ -573,3 +658,8 @@ void linphone_core_write_friends_config(LinphoneCore* lc)
 	linphone_friend_write_to_config_file(lc->config,NULL,i);	/* set the end */
 }
 
+
+void linphone_core_remove_zeroconf_friends(LinphoneCore *lc) {
+	ms_list_free(lc->zeroconf_friends);
+	lc->zeroconf_friends=NULL;
+}

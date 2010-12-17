@@ -207,7 +207,8 @@ static void linphone_gtk_init_liblinphone(const char *config_file,
 	vtable.text_received=linphone_gtk_text_received;
 	vtable.refer_received=linphone_gtk_refer_received;
 	vtable.buddy_info_updated=linphone_gtk_buddy_info_updated;
-
+	vtable.zeroconf_refresh=linphone_gtk_show_zeroconf_friends;
+	
 	linphone_core_set_user_agent("Linphone", LINPHONE_VERSION);
 	the_core=linphone_core_new(&vtable,config_file,factory_config_file,NULL);
 	linphone_core_set_waiting_callback(the_core,linphone_gtk_wait,NULL);
@@ -1310,6 +1311,7 @@ static void linphone_gtk_init_main_window(){
 	linphone_gtk_load_identities();
 	linphone_gtk_set_my_presence(linphone_core_get_presence_info(linphone_gtk_get_core()));
 	linphone_gtk_show_friends();
+	linphone_gtk_show_zeroconf_friends();	
 	linphone_gtk_connect_digits();
 	linphone_gtk_check_menu_items();
 	main_window=linphone_gtk_get_main_window();

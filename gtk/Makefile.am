@@ -10,6 +10,8 @@ UI_FILES=	about.ui \
 		buddylookup.ui \
 		waiting.ui
 
+LDFLAGS= -lavahi-client -lavahi-common -lavahi-glib
+
 PIXMAPS=	\
 		stock_people.png 
 

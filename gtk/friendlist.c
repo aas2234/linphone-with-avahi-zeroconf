@@ -225,6 +225,57 @@ static void linphone_gtk_friend_list_init(GtkWidget *friendlist)
 					gtk_widget_get_toplevel(friendlist),"show_category")),0);
 }
 
+void linphone_core_zeroconf_friend_list_init(GtkWidget *zeroconf_friendlist)
+{
+	GtkListStore *store;
+	GtkCellRenderer *renderer;
+	GtkTreeViewColumn *column;
+	GtkTreeSelection *select;
+
+
+	store = gtk_list_store_new(FRIEND_LIST_NCOL, GDK_TYPE_PIXBUF, G_TYPE_STRING, G_TYPE_STRING,  G_TYPE_POINTER,
+					G_TYPE_STRING, GDK_TYPE_PIXBUF);
+
+	gtk_tree_view_set_model(GTK_TREE_VIEW(zeroconf_friendlist),GTK_TREE_MODEL(store));
+	g_object_unref(G_OBJECT(store));
+
+	renderer = gtk_cell_renderer_pixbuf_new ();
+	column = gtk_tree_view_column_new_with_attributes (_("Name"),
+                                                   renderer,
+                                                   "pixbuf", FRIEND_ICON,
+                                                   NULL);
+	g_object_set (G_OBJECT(column), "resizable", TRUE, NULL);
+	renderer = gtk_cell_renderer_text_new ();
+	gtk_tree_view_column_pack_start(column,renderer,FALSE);
+	gtk_tree_view_column_add_attribute  (column,renderer,
+                                                         "text",
+                                                         FRIEND_NAME);
+
+	gtk_tree_view_append_column (GTK_TREE_VIEW (zeroconf_friendlist), column);
+
+	column = gtk_tree_view_column_new_with_attributes (_("Presence status"),
+                                                   renderer,
+                                                   "text", FRIEND_PRESENCE_STATUS,
+                                                   NULL);
+	g_object_set (G_OBJECT(column), "resizable", TRUE, NULL);
+	gtk_tree_view_column_set_visible(column,linphone_gtk_get_ui_config_int("friendlist_status",1));
+
+	renderer = gtk_cell_renderer_pixbuf_new();
+	gtk_tree_view_column_pack_start(column,renderer,FALSE);
+	gtk_tree_view_column_add_attribute  (column,renderer,
+                                                         "pixbuf",
+                                                         FRIEND_PRESENCE_IMG);
+	gtk_tree_view_append_column (GTK_TREE_VIEW (zeroconf_friendlist), column);
+
+	select = gtk_tree_view_get_selection (GTK_TREE_VIEW (zeroconf_friendlist));
+	gtk_tree_selection_set_mode (select, GTK_SELECTION_SINGLE);
+#if GTK_CHECK_VERSION(2,12,0)
+	gtk_tree_view_set_tooltip_column(GTK_TREE_VIEW(zeroconf_friendlist),FRIEND_SIP_ADDRESS);
+#endif
+	gtk_combo_box_set_active(GTK_COMBO_BOX(linphone_gtk_get_widget(
+					gtk_widget_get_toplevel(zeroconf_friendlist),"show_category")),0);
+}
+
 void linphone_gtk_show_directory_search(void){
 	LinphoneProxyConfig *cfg=NULL;
 	SipSetupContext * ssc=NULL;
@@ -276,6 +327,70 @@ void linphone_gtk_directory_search_activate(GtkWidget *entry){
 void linphone_gtk_directory_search_button_clicked(GtkWidget *button){
 	linphone_gtk_directory_search_activate(
 		linphone_gtk_get_widget(gtk_widget_get_toplevel(button),"directory_search_entry"));
+}
+
+
+void linphone_gtk_show_zeroconf_friends(void){
+	GtkWidget *mw=linphone_gtk_get_main_window();
+	GtkWidget *z_friendlist = linphone_gtk_get_widget(mw,"contact_list2");
+	LinphoneCore *core=linphone_gtk_get_core();
+	GtkListStore *store=NULL;
+	GtkTreeIter iter;
+	const MSList *itf;
+	gboolean lookup=FALSE;
+	const gchar *search=NULL;
+	GtkWidget *filter=linphone_gtk_get_widget(mw,"search_bar2");
+	
+	if (gtk_tree_view_get_model(GTK_TREE_VIEW(z_friendlist))==NULL){
+		linphone_gtk_friend_list_init(z_friendlist);
+	}
+
+	store=GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW(z_friendlist)));
+	gtk_list_store_clear(store);
+
+	search=gtk_entry_get_text(GTK_ENTRY(filter));
+	if (search==NULL || search[0]=='\0')
+		lookup=FALSE;
+	else lookup=TRUE;
+
+	for(itf=linphone_core_get_zeroconf_friends_list(core);itf!=NULL;itf=ms_list_next(itf)){
+		LinphoneFriend *lf=(LinphoneFriend*)itf->data;
+		const LinphoneAddress *f_uri=linphone_friend_get_address(lf);
+		char *uri=linphone_address_as_string(f_uri);
+		const char *name=linphone_address_get_display_name(f_uri);
+		const char *display=name;
+		char *escaped=NULL;
+		if (lookup){
+			if (strstr(uri,search)==NULL){
+				ms_free(uri);
+				continue;
+			}
+		}
+		if (linphone_friend_get_status(lf)!=LinphoneStatusOffline){
+			BuddyInfo *bi;
+			if (name==NULL || name[0]=='\0') display=uri;
+			gtk_list_store_append(store,&iter);
+			gtk_list_store_set(store,&iter,FRIEND_NAME, display,
+					FRIEND_PRESENCE_STATUS, linphone_online_status_to_string(linphone_friend_get_status(lf)),
+					FRIEND_ID,lf,-1);
+			gtk_list_store_set(store,&iter,
+				FRIEND_PRESENCE_IMG, create_status_picture(linphone_friend_get_status(lf)),
+				-1);
+			escaped=g_markup_escape_text(uri,-1);
+			gtk_list_store_set(store,&iter,FRIEND_SIP_ADDRESS,escaped,-1);
+			g_free(escaped);
+			bi=linphone_friend_get_info(lf);
+			if (bi!=NULL && bi->image_data!=NULL){
+				GdkPixbuf *pbuf=
+					_gdk_pixbuf_new_from_memory_at_scale(bi->image_data,bi->image_length,-1,40,TRUE);
+				if (pbuf) {
+					gtk_list_store_set(store,&iter,FRIEND_ICON,pbuf,-1);
+					g_object_unref(G_OBJECT(pbuf));
+				}
+			}
+		}
+		ms_free(uri);
+	}
 }
 
 void linphone_gtk_show_friends(void){
@@ -354,6 +469,29 @@ void linphone_gtk_add_contact(void){
 	gtk_widget_show(w);
 }
 
+void linphone_gtk_zeroconf_refresh(GtkWidget *button){
+	linphone_gtk_show_zeroconf_friends();
+}
+
+void linphone_gtk_add_zeroconf_friend_as_contact(GtkWidget *button){
+	// obtain the sipuri and display name of selected contact
+	GtkWidget *w=gtk_widget_get_toplevel(button);
+	GtkTreeSelection *select = NULL;
+	GtkTreeIter iter;
+	GtkTreeModel *model = NULL	;
+	LinphoneFriend *lf=NULL;
+	select = gtk_tree_view_get_selection(GTK_TREE_VIEW(linphone_gtk_get_widget(w,"contact_list2")));
+	
+	if (gtk_tree_selection_get_selected (select, &model, &iter))
+	{
+		gtk_tree_model_get (model, &iter,FRIEND_ID , &lf, -1);
+		linphone_core_add_zeroconf_friend_as_contact(linphone_gtk_get_core(),lf);	
+		linphone_gtk_show_friends();
+		linphone_gtk_show_zeroconf_friends();
+	}	
+	
+}
+
 void linphone_gtk_remove_contact(GtkWidget *button){
 	GtkWidget *w=gtk_widget_get_toplevel(button);
 	GtkTreeSelection *select;
@@ -412,6 +550,23 @@ void linphone_gtk_chat_selected(GtkWidget *item){
 	GtkTreeModel *model;
 	LinphoneFriend *lf=NULL;
 	select = gtk_tree_view_get_selection(GTK_TREE_VIEW(linphone_gtk_get_widget(w,"contact_list")));
+	if (gtk_tree_selection_get_selected (select, &model, &iter))
+	{
+		char *uri;
+		gtk_tree_model_get (model, &iter,FRIEND_ID , &lf, -1);
+		uri=linphone_address_as_string(linphone_friend_get_address(lf));
+		linphone_gtk_create_chatroom(uri);
+		ms_free(uri);
+	}
+}
+
+void linphone_gtk_zeroconf_chat_selected(GtkWidget *item){
+	GtkWidget *w=gtk_widget_get_toplevel(item);
+	GtkTreeSelection *select;
+	GtkTreeIter iter;
+	GtkTreeModel *model;
+	LinphoneFriend *lf=NULL;
+	select = gtk_tree_view_get_selection(GTK_TREE_VIEW(linphone_gtk_get_widget(w,"contact_list2")));
 	if (gtk_tree_selection_get_selected (select, &model, &iter))
 	{
 		char *uri;
@@ -580,9 +735,117 @@ gboolean linphone_gtk_contact_list_button_pressed(GtkWidget *widget, GdkEventBut
 	return FALSE;
 }
 
+static GtkWidget *linphone_gtk_create_zeroconf_contact_menu(GtkWidget *contact_list){
+	GtkWidget *menu=gtk_menu_new();
+	GtkWidget *menu_item;
+	gchar *add_contact_label=NULL;
+	gchar *call_label=NULL;
+	gchar *text_label=NULL;
+	gchar *refresh_label=NULL;
+	gchar *name=NULL;
+	GtkTreeSelection *select;
+	GtkTreeIter iter;
+	GtkTreeModel *model;
+	GtkWidget *image;
+	LinphoneCore *lc=linphone_gtk_get_core();
+	LinphoneProxyConfig *cfg=NULL;
+	SipSetupContext * ssc=NULL;
+
+	linphone_core_get_default_proxy(lc,&cfg);
+	if (cfg){
+		ssc=linphone_proxy_config_get_sip_setup_context(cfg);
+	}
+
+	g_signal_connect(G_OBJECT(menu), "selection-done", G_CALLBACK (gtk_widget_destroy), NULL);
+	select = gtk_tree_view_get_selection(GTK_TREE_VIEW(contact_list));
+	if (gtk_tree_selection_get_selected (select, &model, &iter)){
+		gtk_tree_model_get(model, &iter,FRIEND_NAME , &name, -1);
+		add_contact_label=g_strdup_printf(_("Add %s as Contact"),name);
+		call_label=g_strdup_printf(_("Call %s"),name);
+		text_label=g_strdup_printf(_("Send text to %s"),name);
+		g_free(name);
+	}
+	if (call_label){
+		menu_item=gtk_image_menu_item_new_with_label(call_label);
+		image=gtk_image_new_from_stock(GTK_STOCK_NETWORK,GTK_ICON_SIZE_MENU);
+		gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(menu_item),image);
+		gtk_widget_show(image);
+		gtk_widget_show(menu_item);
+		gtk_menu_shell_append(GTK_MENU_SHELL(menu),menu_item);
+		g_signal_connect_swapped(G_OBJECT(menu_item),"activate",(GCallback)linphone_gtk_call_selected,contact_list);
+	}
+	if (text_label){
+		menu_item=gtk_image_menu_item_new_with_label(text_label);
+		image=gtk_image_new_from_stock(GTK_STOCK_NETWORK,GTK_ICON_SIZE_MENU);
+		gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(menu_item),image);
+		gtk_widget_show(image);
+		gtk_widget_show(menu_item);
+		gtk_menu_shell_append(GTK_MENU_SHELL(menu),menu_item);
+		g_signal_connect_swapped(G_OBJECT(menu_item),"activate",(GCallback)linphone_gtk_zeroconf_chat_selected,contact_list);
+	}
+	if (add_contact_label){
+		menu_item=gtk_image_menu_item_new_with_label(add_contact_label);
+		image=gtk_image_new_from_stock(GTK_STOCK_ADD,GTK_ICON_SIZE_MENU);
+		gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(menu_item),image);
+		gtk_widget_show(image);
+		gtk_widget_show(menu_item);
+		gtk_menu_shell_append(GTK_MENU_SHELL(menu),menu_item);
+		g_signal_connect_swapped(G_OBJECT(menu_item),"activate",(GCallback)linphone_gtk_add_zeroconf_friend_as_contact,contact_list);
+	}
+
+
+	if (ssc && (sip_setup_context_get_capabilities(ssc) & SIP_SETUP_CAP_BUDDY_LOOKUP)) {
+		gchar *tmp=g_strdup_printf(_("Add new contact from %s directory"),linphone_proxy_config_get_domain(cfg));
+		menu_item=gtk_image_menu_item_new_with_label(tmp);
+		g_free(tmp);
+		image=gtk_image_new_from_stock(GTK_STOCK_ADD,GTK_ICON_SIZE_MENU);
+		gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(menu_item),image);
+		gtk_widget_show(image);
+		gtk_widget_show(menu_item);
+		gtk_menu_shell_append(GTK_MENU_SHELL(menu),menu_item);
+		g_signal_connect_swapped(G_OBJECT(menu_item),"activate",(GCallback)linphone_gtk_show_buddy_lookup_window,ssc);
+		gtk_widget_show(menu);
+	}
+
+	refresh_label=g_strdup_printf(_("Refresh"));
+	menu_item=gtk_image_menu_item_new_with_label(refresh_label);
+	image=gtk_image_new_from_stock(GTK_STOCK_NETWORK,GTK_ICON_SIZE_MENU);
+	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(menu_item),image);
+	gtk_widget_show(image);
+	gtk_widget_show(menu_item);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menu),menu_item);
+	g_signal_connect_swapped(G_OBJECT(menu_item),"activate",(GCallback)linphone_gtk_zeroconf_refresh,contact_list);
+	gtk_widget_show(menu);
+	gtk_menu_attach_to_widget (GTK_MENU (menu), contact_list, NULL);
+	
+	if (call_label) g_free(call_label);
+	if (text_label) g_free(text_label);
+	if (add_contact_label) g_free(add_contact_label);
+	if (refresh_label) g_free(refresh_label);	
+	return menu;
+}
+
+gboolean linphone_gtk_popup_zeroconf_contact_menu(GtkWidget *list, GdkEventButton *event){
+	GtkWidget *m=linphone_gtk_create_zeroconf_contact_menu(list);
+	gtk_menu_popup (GTK_MENU (m), NULL, NULL, NULL, NULL,
+                  event ? event->button : 0, event ? event->time : gtk_get_current_event_time());
+	return TRUE;
+}
+
+gboolean linphone_gtk_zeroconf_contact_list_button_pressed(GtkWidget *widget, GdkEventButton *event){
+	/* Ignore double-clicks and triple-clicks */
+	if (event->button == 3 && event->type == GDK_BUTTON_PRESS)
+	{
+		return linphone_gtk_popup_zeroconf_contact_menu(widget, event);
+	}
+	return FALSE;
+}
+
+
 void linphone_gtk_buddy_info_updated(LinphoneCore *lc, LinphoneFriend *lf){
 	/*refresh the entire list*/
 	linphone_gtk_show_friends();
+	linphone_gtk_show_zeroconf_friends();
 }
 
 

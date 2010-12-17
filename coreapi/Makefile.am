@@ -8,8 +8,17 @@ linphone_includedir=$(includedir)/linphone
 
 linphone_include_HEADERS=linphonecore.h linphonefriend.h linphonecore_utils.h ../config.h lpconfig.h sipsetup.h
 
+## For Glib Headers
+
+include_GLIBCFLAGS=`pkg-config --cflags glib-2.0 avahi-client`
+
+## For Avahi Glib Libraries 
+
+lib_GLIBLDFLAGS=`pkg-config --libs glib-2.0 avahi-client`
+
 INCLUDES = \
 	-I$(top_srcdir)\
+	$(include_GLIBCFLAGS)\
 	$(MEDIASTREAMER_CFLAGS)
 
 
@@ -35,10 +44,13 @@ liblinphone_la_SOURCES=\
 	linphonecall.c \
 	sipsetup.c sipsetup.h \
 	siplogin.c \
-	lsd.c linphonecore_utils.h
+	lsd.c linphonecore_utils.h \
+	avahi-main.c avahi.h \
+	avahi-publish-glib.c avahi.h \
+	avahi-service-browser.c avahi.h
 
 
-liblinphone_la_LDFLAGS= -version-info $(LIBLINPHONE_SO_VERSION) -no-undefined
+liblinphone_la_LDFLAGS= -version-info $(LIBLINPHONE_SO_VERSION) -no-undefined $(lib_GLIBLDFLAGS)
 
 liblinphone_la_LIBADD= \
 		$(EXOSIP_LIBS) \
@@ -66,4 +78,5 @@ AM_CFLAGS=$(STRICT_OPTIONS)  -DIN_LINPHONE \
 	-DLOG_DOMAIN=\"LinphoneCore\" \
 	 $(IPV6_CFLAGS) \
 	 -DORTP_INET6 \
-	 $(VIDEO_CFLAGS) 
+	 $(VIDEO_CFLAGS) \
+	 $(include_GLIBCFLAGS)
